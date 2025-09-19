@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 import matplotlib
 import io
 import urllib, base64
+import numpy as np
+import os
+from openai import OpenAI
+from dotenv import load_dotenv
 
 def home(request):
     #return HttpResponse('<h1>Welcome to Home Page</h1>')
@@ -123,3 +127,80 @@ def generate_bar_chart(data, xlabel, ylabel):
     buffer.close()
     graphic = base64.b64encode(image_png).decode('utf-8')
     return graphic
+
+def cosine_similarity(a, b):
+    """Calculate cosine similarity between two vectors"""
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+def recommend_movie(request):
+    """Recommend movie based on user prompt using embeddings"""
+    recommended_movie = None
+    similarity_score = 0
+    error_message = None
+    
+    if request.method == 'POST':
+        prompt = request.POST.get('prompt', '').strip()
+        
+        if prompt:
+            try:
+                # Load OpenAI API key
+                # Try multiple paths for the .env file
+                env_paths = [
+                    '../openAI.env',
+                    os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'openAI.env'),
+                    'openAI.env'
+                ]
+                
+                api_key = None
+                for path in env_paths:
+                    if os.path.exists(path):
+                        load_dotenv(path)
+                        api_key = os.environ.get('openai_apikey')
+                        if api_key:
+                            break
+                
+                if not api_key:
+                    error_message = "OpenAI API key not found. Please check your openAI.env file."
+                else:
+                    client = OpenAI(api_key=api_key)
+                    
+                    # Generate embedding for the prompt
+                    response = client.embeddings.create(
+                        input=[prompt],
+                        model="text-embedding-3-small"
+                    )
+                    prompt_emb = np.array(response.data[0].embedding, dtype=np.float32)
+                    
+                    # Find the most similar movie
+                    best_movie = None
+                    max_similarity = -1
+                    
+                    for movie in Movie.objects.all():
+                        try:
+                            movie_emb = np.frombuffer(movie.emb, dtype=np.float32)
+                            similarity = cosine_similarity(prompt_emb, movie_emb)
+                            
+                            if similarity > max_similarity:
+                                max_similarity = similarity
+                                best_movie = movie
+                        except Exception as e:
+                            # Skip movies with invalid embeddings
+                            continue
+                    
+                    if best_movie:
+                        recommended_movie = best_movie
+                        similarity_score = max_similarity
+                    else:
+                        error_message = "No movies with valid embeddings found in database."
+                    
+            except Exception as e:
+                error_message = f"Error generating recommendation: {str(e)}"
+        else:
+            error_message = "Please enter a description or prompt."
+    
+    return render(request, 'recommend.html', {
+        'recommended_movie': recommended_movie,
+        'similarity_score': similarity_score,
+        'error_message': error_message,
+        'prompt': request.POST.get('prompt', '') if request.method == 'POST' else ''
+    })

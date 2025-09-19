@@ -1,3 +1,4 @@
+# Archivos de entorno y API keys
 /openAI.env
 /DjangoProjectBase2/*
 /TutorialGoogle/*
@@ -7,3 +8,30 @@
 /*.env
 /images.zip
 /DjangoProjectBase/openAI.env
+
+# Entorno virtual de Python
+env/
+venv/
+.venv/
+
+# Archivos de caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Base de datos local
+*.sqlite3
+*.db
+
+# Archivos de configuración local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Archivos temporales
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
